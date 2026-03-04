@@ -1,230 +1,361 @@
 # 통합 포인트 관리 시스템
 
-AWS 클라우드 + Docker 기반 엔터프라이즈급 포인트 적립/사용 관리 플랫폼
+회원 포인트 적립/사용/관리 플랫폼 — Docker로 로컬 실행, AWS에 배포합니다.
 
-## 프로젝트 구조
+---
 
+## 목차
+
+1. [Docker 설치](#1-docker-설치)
+2. [프로젝트 받기](#2-프로젝트-받기)
+3. [환경 변수 설정](#3-환경-변수-설정)
+4. [실행하기](#4-실행하기)
+5. [접속 주소 및 기본 계정](#5-접속-주소-및-기본-계정)
+6. [AWS 배포 가이드](#6-aws-배포-가이드)
+7. [CI/CD 자동 배포](#7-cicd-자동-배포-github-actions)
+8. [자주 쓰는 명령어](#8-자주-쓰는-명령어)
+9. [프로젝트 구조](#9-프로젝트-구조)
+
+---
+
+## 1. Docker 설치
+
+Docker만 있으면 Node.js, PostgreSQL, Redis를 **따로 설치하지 않아도** 됩니다.
+
+### Windows / Mac
+[https://www.docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop) 에서 **Docker Desktop** 다운로드 후 설치
+
+설치 확인:
+```bash
+docker --version
+# Docker version 25.x.x 이상이면 정상
 ```
-sp-connect/
-├── backend/                     # NestJS 백엔드
-│   ├── src/
-│   │   ├── auth/                # 인증 (JWT, 카카오, 네이버, 통신사 본인인증)
-│   │   ├── points/              # 포인트 핵심 로직 (ACID 트랜잭션)
-│   │   ├── users/               # 회원 관리
-│   │   ├── admin/               # 관리자 대시보드 API
-│   │   ├── external/            # 외부 사이트 연동 API
-│   │   └── common/              # 공통 가드/필터/인터셉터
-│   ├── Dockerfile
-│   └── package.json
-├── frontend/                    # Next.js 14 프론트엔드
-│   ├── src/
-│   │   ├── app/
-│   │   │   ├── login/           # 로그인 페이지 (모바일 최적화)
-│   │   │   ├── member/          # 회원용 페이지
-│   │   │   └── admin/           # 관리자 대시보드
-│   │   ├── store/               # Zustand 상태관리
-│   │   ├── types/               # TypeScript 타입
-│   │   └── utils/               # API 클라이언트 (Axios)
-│   └── Dockerfile
-├── database/
-│   └── init.sql                 # PostgreSQL 스키마 + 초기 데이터
-├── infra/
-│   └── nginx/nginx.conf         # 리버스 프록시 설정
-├── docs/
-│   └── API_SPEC.md              # API 명세서
-├── .github/workflows/
-│   └── deploy.yml               # CI/CD (GitHub Actions → AWS ECS)
-├── docker-compose.yml           # 로컬 개발 환경
-└── .env.example                 # 환경 변수 예시
+
+### Ubuntu (Linux)
+```bash
+# Docker 설치
+curl -fsSL https://get.docker.com | sh
+
+# 현재 사용자를 docker 그룹에 추가 (sudo 없이 사용)
+sudo usermod -aG docker $USER
+newgrp docker
+
+# 설치 확인
+docker --version
+```
+
+> **Git도 필요합니다.**
+> - Windows: [https://git-scm.com](https://git-scm.com) 에서 다운로드
+> - Mac: `xcode-select --install`
+> - Ubuntu: `sudo apt install git`
+
+---
+
+## 2. 프로젝트 받기
+
+```bash
+git clone https://github.com/ComMslee/sp-connect.git
+cd sp-connect
 ```
 
 ---
 
-## 로컬 환경 실행 가이드
+## 3. 환경 변수 설정
 
-### 사전 요구사항
-- Docker Desktop 4.x+
-- Node.js 20+ (로컬 개발 시)
-- Git
+`.env.example` 파일을 복사해서 `.env` 파일을 만듭니다.
 
-### 1단계: 환경 변수 설정
 ```bash
 cp .env.example .env
 ```
-`.env` 파일을 열어 필수 값을 설정합니다:
-```
-DB_PASSWORD=your_strong_password
-JWT_SECRET=$(openssl rand -base64 64)  # 64자 랜덤 시크릿 생성
+
+`.env` 파일을 열고 아래 두 가지만 수정하면 로컬 실행이 가능합니다:
+
+```env
+DB_PASSWORD=원하는DB비밀번호     # 예: MyPass@1234
+JWT_SECRET=랜덤문자열64자이상    # 예: openssl rand -base64 64 로 생성
 ```
 
-### 2단계: Docker Compose 실행
+**JWT_SECRET 빠르게 생성하는 법:**
 ```bash
-# 전체 서비스 시작 (PostgreSQL + Redis + Backend + Frontend + Nginx)
-docker-compose up -d
+# Mac / Linux
+openssl rand -base64 64
 
-# 로그 확인
+# 위 명령이 없으면 아래 사이트에서 생성
+# https://generate-secret.vercel.app/64
+```
+
+> 소셜 로그인(카카오/네이버) 및 본인인증은 선택 사항입니다.
+> 해당 KEY가 없어도 일반 로그인/포인트 기능은 모두 정상 동작합니다.
+
+---
+
+## 4. 실행하기
+
+```bash
+# 모든 서비스 백그라운드 실행 (최초 실행 시 이미지 빌드로 5~10분 소요)
+docker-compose up -d
+```
+
+실행 상태 확인:
+```bash
+docker-compose ps
+```
+
+아래처럼 모두 `Up` 상태이면 정상입니다:
+```
+NAME               STATUS
+point_postgres     Up (healthy)
+point_redis        Up (healthy)
+point_backend      Up (healthy)
+point_frontend     Up
+point_nginx        Up
+```
+
+백엔드 로그 확인 (문제가 있을 때):
+```bash
 docker-compose logs -f backend
 ```
 
-### 3단계: 접속
-| 서비스 | URL |
-|--------|-----|
-| 프론트엔드 (회원) | http://localhost:3001/login |
-| 프론트엔드 (관리자) | http://localhost:3001/admin/dashboard |
-| Swagger API 문서 | http://localhost:3000/api/docs |
-| Nginx 통합 | http://localhost:80 |
-
-### 기본 관리자 계정
-```
-이메일: admin@pointsystem.com
-비밀번호: Admin@123!  ← 최초 접속 후 반드시 변경
-```
-
-### 서비스 종료
+서비스 종료:
 ```bash
-docker-compose down           # 컨테이너만 종료 (데이터 유지)
-docker-compose down -v        # 컨테이너 + 볼륨 삭제 (데이터 초기화)
+docker-compose down          # 종료 (데이터 유지)
+docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
 ```
 
 ---
 
-## AWS 배포 가이드
+## 5. 접속 주소 및 기본 계정
 
-### 아키텍처 개요
+실행 후 브라우저에서 접속하세요:
+
+| 용도 | 주소 |
+|------|------|
+| 회원 화면 | http://localhost:3001/login |
+| 관리자 화면 | http://localhost:3001/admin/dashboard |
+| API 문서 (Swagger) | http://localhost:3000/api/docs |
+
+**기본 관리자 계정**
 ```
-Internet → ALB → ECS Fargate (Backend + Frontend)
-                     ↓
-               AWS RDS (PostgreSQL) + ElastiCache (Redis)
-                     ↓
-               ECR (Docker Images)
+이메일:   admin@pointsystem.com
+비밀번호: Admin@123!
+```
+> 처음 접속 후 반드시 비밀번호를 변경하세요.
+
+---
+
+## 6. AWS 배포 가이드
+
+### 전체 구조
+
+```
+사용자
+  │
+  ▼
+ALB (로드밸런서, HTTPS)
+  │
+  ├─▶ ECS Fargate - Backend (NestJS)
+  │         │
+  │         ├─▶ RDS (PostgreSQL)
+  │         └─▶ ElastiCache (Redis)
+  │
+  └─▶ ECS Fargate - Frontend (Next.js)
+
+이미지 저장: ECR (Amazon Container Registry)
 ```
 
-### 1. AWS RDS 설정 (PostgreSQL)
+---
 
-1. **RDS 인스턴스 생성**
-   - Engine: PostgreSQL 16
-   - Instance: `db.t3.medium` (운영: `db.r6g.large`)
-   - Storage: 20GB GP3 (자동 확장 활성화)
-   - Multi-AZ: 운영 환경 활성화 권장
-   - 암호화: AWS KMS 활성화
+### 6-1. AWS RDS 생성 (PostgreSQL DB)
 
-2. **보안 그룹 설정**
-   ```
-   RDS 보안 그룹 인바운드:
-   - Port 5432 / Source: ECS 태스크 보안 그룹 ID
-   (절대 0.0.0.0/0으로 열지 말 것!)
-   ```
+AWS 콘솔 → **RDS** → **데이터베이스 생성**
 
-3. **DB 초기화**
-   ```bash
-   # RDS 연결 후 스키마 실행
-   psql -h your-rds-endpoint.rds.amazonaws.com -U postgres -d pointdb \
-        -f database/init.sql
-   ```
+| 항목 | 설정값 |
+|------|--------|
+| 엔진 | PostgreSQL 16 |
+| 인스턴스 | `db.t3.medium` (개발) / `db.r6g.large` (운영) |
+| 스토리지 | 20GB GP3, 자동 확장 ON |
+| DB 이름 | `pointdb` |
+| 사용자 | `postgres` |
+| Multi-AZ | 운영 환경에서는 활성화 권장 |
+| 퍼블릭 액세스 | **아니오** (보안상 필수) |
 
-4. **백업 설정**
-   - 자동 백업: 7일 보관
-   - 백업 윈도우: 새벽 3시-4시 (KST)
-   - 스냅샷: 배포 전 수동 스냅샷 권장
-
-### 2. Amazon ECR 저장소 생성
+RDS 생성 후 DB 스키마 초기화:
 ```bash
-aws ecr create-repository --repository-name point-backend --region ap-northeast-2
+psql -h [RDS엔드포인트] -U postgres -d pointdb -f database/init.sql
+```
+
+---
+
+### 6-2. ECR 이미지 저장소 생성
+
+```bash
+aws ecr create-repository --repository-name point-backend  --region ap-northeast-2
 aws ecr create-repository --repository-name point-frontend --region ap-northeast-2
 ```
 
-### 3. ECS Fargate 클러스터 설정
+---
+
+### 6-3. 보안 그룹 설정
+
+각 서비스가 필요한 포트만 열어야 합니다:
+
+| 보안 그룹 | 허용 포트 | 허용 출처 |
+|-----------|-----------|-----------|
+| ALB-SG | 80, 443 | 0.0.0.0/0 (전체 인터넷) |
+| ECS-SG | 3000, 3001 | ALB-SG만 |
+| RDS-SG | 5432 | ECS-SG만 |
+| Redis-SG | 6379 | ECS-SG만 |
+
+> RDS와 Redis는 인터넷에서 절대 직접 접근하면 안 됩니다.
+
+---
+
+### 6-4. Secrets Manager에 비밀 정보 저장
+
+DB 비밀번호, JWT 키 등은 환경 변수로 넣지 말고 Secrets Manager에 저장합니다:
+
+```bash
+# DB 비밀번호
+aws secretsmanager create-secret \
+  --name "point/db-password" \
+  --secret-string "강력한DB비밀번호"
+
+# JWT 시크릿
+aws secretsmanager create-secret \
+  --name "point/jwt-secret" \
+  --secret-string "$(openssl rand -base64 64)"
+```
+
+ECS 태스크 정의의 `secrets` 항목에서 위 이름으로 참조합니다.
+
+---
+
+### 6-5. ECS Fargate 서비스 생성
 
 ```bash
 # 클러스터 생성
 aws ecs create-cluster --cluster-name point-management-cluster
 
-# 태스크 정의 등록 (task-definition.json 참고)
-aws ecs register-task-definition --cli-input-json file://infra/ecs/backend-task-def.json
-aws ecs register-task-definition --cli-input-json file://infra/ecs/frontend-task-def.json
-
-# 서비스 생성
+# 서비스 생성 (백엔드)
 aws ecs create-service \
   --cluster point-management-cluster \
   --service-name point-backend-service \
   --task-definition point-backend \
   --desired-count 2 \
   --launch-type FARGATE \
-  --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx],securityGroups=[sg-xxx],assignPublicIp=DISABLED}"
+  --network-configuration \
+    "awsvpcConfiguration={subnets=[subnet-xxx],securityGroups=[sg-xxx],assignPublicIp=DISABLED}"
 ```
 
-### 4. 보안 그룹 설정 요약
+---
 
-| 보안 그룹 | 인바운드 | 출처 |
-|-----------|----------|------|
-| ALB-SG | 443, 80 | 0.0.0.0/0 |
-| ECS-SG | 3000, 3001 | ALB-SG |
-| RDS-SG | 5432 | ECS-SG |
-| Redis-SG | 6379 | ECS-SG |
+### 6-6. 수동 배포 (CI/CD 없이 직접 올리기)
 
-### 5. AWS Secrets Manager (환경 변수 보안 관리)
 ```bash
-# DB 비밀번호 저장
-aws secretsmanager create-secret \
-  --name "point-management/db-password" \
-  --secret-string "your_strong_db_password"
+# 1) ECR 로그인
+aws ecr get-login-password --region ap-northeast-2 \
+  | docker login --username AWS --password-stdin \
+    [계정ID].dkr.ecr.ap-northeast-2.amazonaws.com
 
-# JWT 시크릿 저장
-aws secretsmanager create-secret \
-  --name "point-management/jwt-secret" \
-  --secret-string "$(openssl rand -base64 64)"
-```
-ECS 태스크 정의에서 `secrets` 섹션으로 참조합니다.
-
-### 6. 수동 배포 (CI/CD 없이)
-```bash
-# 1. ECR 로그인
-aws ecr get-login-password --region ap-northeast-2 | \
-  docker login --username AWS --password-stdin \
-  <account-id>.dkr.ecr.ap-northeast-2.amazonaws.com
-
-# 2. 백엔드 빌드 & 푸시
+# 2) 백엔드 이미지 빌드 & 업로드
 docker build -t point-backend ./backend
 docker tag point-backend:latest \
-  <account-id>.dkr.ecr.ap-northeast-2.amazonaws.com/point-backend:latest
-docker push <account-id>.dkr.ecr.ap-northeast-2.amazonaws.com/point-backend:latest
+  [계정ID].dkr.ecr.ap-northeast-2.amazonaws.com/point-backend:latest
+docker push \
+  [계정ID].dkr.ecr.ap-northeast-2.amazonaws.com/point-backend:latest
 
-# 3. ECS 서비스 강제 재배포
+# 3) ECS 서비스 재배포
 aws ecs update-service \
   --cluster point-management-cluster \
   --service point-backend-service \
   --force-new-deployment
 ```
 
+> 프론트엔드도 동일한 방식으로 `point-frontend` 저장소에 올립니다.
+
 ---
 
-## CI/CD 워크플로우 (GitHub Actions)
+## 7. CI/CD 자동 배포 (GitHub Actions)
 
-`.github/workflows/deploy.yml`에 정의된 자동화 파이프라인:
+`main` 브랜치에 push하면 자동으로 테스트 → 빌드 → AWS 배포까지 실행됩니다.
 
 ```
-Push to main
-    ↓
-[1] Test Job
-    - PostgreSQL 서비스 컨테이너 실행
-    - 단위 테스트 + 커버리지
-    ↓
-[2] Build & Push Job (테스트 성공 시)
-    - Docker 이미지 빌드
-    - ECR 푸시 (태그: commit SHA + latest)
-    ↓
-[3] Deploy Job
-    - ECS 태스크 정의 업데이트
-    - 백엔드 서비스 배포 (롤링 업데이트)
-    - 프론트엔드 서비스 배포
-    - 서비스 안정화 대기
+main 브랜치에 push
+       │
+       ▼
+  ① 자동 테스트
+  (DB 포함 통합 테스트)
+       │ 성공 시
+       ▼
+  ② Docker 이미지 빌드
+  ECR에 업로드
+       │
+       ▼
+  ③ ECS 서비스 배포
+  (무중단 롤링 업데이트)
 ```
 
-### GitHub Secrets 설정 필요
+**GitHub 저장소 → Settings → Secrets에 아래 값 등록 필요:**
+
+| 키 이름 | 설명 |
+|---------|------|
+| `AWS_ACCESS_KEY_ID` | AWS IAM 사용자 Access Key |
+| `AWS_SECRET_ACCESS_KEY` | AWS IAM 사용자 Secret Key |
+| `NEXT_PUBLIC_API_URL` | 운영 서버 API 주소 (예: `https://api.yourdomain.com/api/v1`) |
+
+> IAM 사용자는 ECR, ECS 권한만 부여하세요 (최소 권한 원칙).
+
+---
+
+## 8. 자주 쓰는 명령어
+
+```bash
+# 전체 재시작
+docker-compose restart
+
+# 특정 서비스만 재시작
+docker-compose restart backend
+
+# 로그 실시간 확인
+docker-compose logs -f backend
+docker-compose logs -f frontend
+
+# DB 접속 (로컬)
+docker exec -it point_postgres psql -U postgres -d pointdb
+
+# 이미지 새로 빌드 (코드 변경 후)
+docker-compose up -d --build backend
 ```
-AWS_ACCESS_KEY_ID          # IAM 사용자 Access Key (최소 권한 원칙)
-AWS_SECRET_ACCESS_KEY      # IAM 사용자 Secret Key
-NEXT_PUBLIC_API_URL        # 프로덕션 API URL
+
+---
+
+## 9. 프로젝트 구조
+
+```
+sp-connect/
+├── backend/                  # NestJS 백엔드 API 서버
+│   └── src/
+│       ├── auth/             # 로그인, 소셜 로그인, 본인인증
+│       ├── points/           # 포인트 적립/사용/만료 (핵심 로직)
+│       ├── users/            # 회원 정보
+│       ├── admin/            # 관리자 API
+│       └── external/         # 외부 사이트 연동 API
+│
+├── frontend/                 # Next.js 프론트엔드
+│   └── src/app/
+│       ├── login/            # 로그인 페이지
+│       ├── member/           # 회원용 화면 (포인트 조회/사용)
+│       └── admin/            # 관리자 화면 (대시보드, 회원관리)
+│
+├── database/
+│   └── init.sql              # DB 테이블 생성 스크립트
+│
+├── infra/nginx/nginx.conf    # 웹서버 설정
+├── docs/API_SPEC.md          # 외부 연동 API 명세서
+├── .github/workflows/
+│   └── deploy.yml            # 자동 배포 설정
+├── docker-compose.yml        # 로컬 전체 실행 설정
+└── .env.example              # 환경 변수 예시
 ```
 
 ---
@@ -233,58 +364,8 @@ NEXT_PUBLIC_API_URL        # 프로덕션 API URL
 
 | 영역 | 기술 |
 |------|------|
-| Backend | NestJS 10, TypeORM, PostgreSQL 16 |
-| Frontend | Next.js 14, React 18, Tailwind CSS, Zustand |
-| 인증 | JWT (RS256), Passport.js, 카카오/네이버 OAuth |
-| DB | PostgreSQL 16 (AWS RDS), Redis 7 (ElastiCache) |
-| 인프라 | Docker, AWS ECS Fargate, ECR, ALB |
+| 백엔드 | NestJS, TypeORM, PostgreSQL |
+| 프론트엔드 | Next.js 14, Tailwind CSS, Zustand |
+| 인증 | JWT, 카카오/네이버 OAuth, NICE 본인인증 |
+| 인프라 | Docker, AWS ECS Fargate, RDS, ElastiCache |
 | CI/CD | GitHub Actions |
-| 모니터링 | Winston 로깅, AWS CloudWatch |
-
----
-
-## 포인트 트랜잭션 보장 방법
-
-```
-모든 포인트 적립/사용은 PostgreSQL SERIALIZABLE 트랜잭션으로 처리됩니다.
-
-1. 비관적 잠금 (SELECT FOR UPDATE)으로 잔액 조회
-2. 잔액 검증 (음수 방지, CHECK 제약)
-3. 트랜잭션 레코드 + 잔액 업데이트 원자적 실행
-4. referenceId 기반 중복 요청 방지 (멱등성)
-5. balance_before/balance_after 양방향 검증
-```
-
----
-
-## 본인인증 연동 가이드
-
-현재 **MOCK 모드**로 동작합니다. 실제 서비스 전환 시:
-
-1. NICE평가정보(https://www.niceid.co.kr) 또는 KMC와 계약
-2. `.env`에 `TELECOM_PROVIDER=NICE` 설정
-3. `NICE_SITE_CODE`, `NICE_SITE_PASSWORD` 입력
-4. `backend/src/auth/telecom-auth.service.ts`의 `niceCreateRequest`, `niceVerifyResult` 메서드 구현
-
----
-
-## 개발 시 자주 사용하는 명령어
-
-```bash
-# 백엔드 로컬 실행
-cd backend && npm run start:dev
-
-# 프론트엔드 로컬 실행
-cd frontend && npm run dev
-
-# 테스트
-cd backend && npm run test
-cd backend && npm run test:e2e
-
-# DB 마이그레이션
-cd backend && npm run migration:run
-
-# 포인트 만료 처리 수동 실행 (개발용)
-curl -X POST http://localhost:3000/api/v1/admin/points/expire-now \
-  -H "Authorization: Bearer <admin_token>"
-```
