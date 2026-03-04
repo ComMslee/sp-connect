@@ -1,6 +1,6 @@
 # 통합 포인트 관리 시스템
 
-회원 포인트 적립/사용/관리 플랫폼 — Docker로 로컬 실행, AWS에 배포합니다.
+회원 포인트 적립/사용/관리 플랫폼 — Docker로 로컬 실행 또는 테스트 서버/AWS에 배포합니다.
 
 ---
 
@@ -11,10 +11,11 @@
 3. [환경 변수 설정](#3-환경-변수-설정)
 4. [실행하기](#4-실행하기)
 5. [접속 주소 및 기본 계정](#5-접속-주소-및-기본-계정)
-6. [AWS 배포 가이드](#6-aws-배포-가이드)
-7. [CI/CD 자동 배포](#7-cicd-자동-배포-github-actions)
-8. [자주 쓰는 명령어](#8-자주-쓰는-명령어)
-9. [프로젝트 구조](#9-프로젝트-구조)
+6. [테스트 서버 배포 (Docker Compose)](#6-테스트-서버-배포-docker-compose)
+7. [AWS 배포 가이드](#7-aws-배포-가이드)
+8. [CI/CD 자동 배포](#8-cicd-자동-배포-github-actions)
+9. [자주 쓰는 명령어](#9-자주-쓰는-명령어)
+10. [프로젝트 구조](#10-프로젝트-구조)
 
 ---
 
@@ -143,7 +144,142 @@ docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
 
 ---
 
-## 6. AWS 배포 가이드
+## 6. 테스트 서버 배포 (Docker Compose)
+
+AWS 없이 **일반 리눅스 서버 (VPS, 사내 서버, 클라우드 VM 등)** 에도 그대로 올릴 수 있습니다.
+로컬 실행과 방식이 동일하고, 도메인/HTTPS만 추가로 설정하면 됩니다.
+
+### 6-1. 서버 준비
+
+Ubuntu 22.04 기준 (타 리눅스도 동일):
+
+```bash
+# 서버에 SSH 접속 후 Docker 설치
+curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+newgrp docker
+
+# Git 설치
+sudo apt install -y git
+```
+
+### 6-2. 코드 받고 실행
+
+```bash
+# 프로젝트 클론
+git clone https://github.com/ComMslee/sp-connect.git
+cd sp-connect
+
+# 환경 변수 설정
+cp .env.example .env
+nano .env   # DB_PASSWORD, JWT_SECRET 수정
+```
+
+```bash
+# 실행 (로컬과 동일)
+docker-compose up -d
+
+# 상태 확인
+docker-compose ps
+```
+
+이것만으로 서버에서 동작합니다. 서버 IP로 접속 가능:
+```
+http://서버IP:3001       # 프론트엔드
+http://서버IP:3000/api/docs  # Swagger
+```
+
+---
+
+### 6-3. 도메인 + HTTPS 설정 (선택사항)
+
+도메인이 있다면 **Certbot(무료 SSL)** 으로 HTTPS를 적용할 수 있습니다.
+
+```bash
+# Certbot 설치
+sudo apt install -y certbot
+
+# 80포트를 잠깐 비우고 인증서 발급
+docker-compose stop nginx
+sudo certbot certonly --standalone -d yourdomain.com
+docker-compose start nginx
+```
+
+발급된 인증서를 Nginx에 연결:
+```bash
+# 인증서 위치를 nginx가 읽을 수 있도록 복사
+sudo cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem infra/nginx/certs/
+sudo cp /etc/letsencrypt/live/yourdomain.com/privkey.pem   infra/nginx/certs/
+```
+
+`infra/nginx/nginx.conf`에서 443 HTTPS 블록을 활성화한 뒤:
+```bash
+docker-compose restart nginx
+```
+
+---
+
+### 6-4. 서버 재부팅 시 자동 시작
+
+```bash
+# 서버 켜질 때 자동으로 서비스 올라오게 설정
+sudo systemctl enable docker
+
+# docker-compose를 systemd 서비스로 등록
+sudo tee /etc/systemd/system/point-system.service > /dev/null <<EOF
+[Unit]
+Description=Point Management System
+After=docker.service
+Requires=docker.service
+
+[Service]
+WorkingDirectory=/home/ubuntu/sp-connect
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+RemainAfterExit=yes
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl enable point-system
+sudo systemctl start point-system
+```
+
+이제 서버가 재부팅되어도 자동으로 실행됩니다.
+
+---
+
+### 6-5. 코드 업데이트 방법
+
+새 버전을 배포할 때:
+```bash
+cd sp-connect
+
+# 최신 코드 받기
+git pull
+
+# 이미지 다시 빌드 후 재시작
+docker-compose up -d --build
+```
+
+---
+
+### 참고: 어떤 서버를 쓸 수 있나요?
+
+| 서버 종류 | 예시 | 비용 |
+|-----------|------|------|
+| 국내 클라우드 VM | NCloud, KT Cloud, Naver Cloud | 월 1~5만원 |
+| 해외 VPS | DigitalOcean, Vultr, Hetzner | 월 $5~20 |
+| AWS EC2 (직접) | t3.small 이상 | 월 $15~ |
+| 사내 서버 | 물리 서버, NAS | 별도 |
+
+> 최소 사양: CPU 2코어, RAM 2GB, 디스크 20GB 이상 권장
+
+---
+
+## 7. AWS 배포 가이드
 
 ### 전체 구조
 
@@ -275,7 +411,7 @@ aws ecs update-service \
 
 ---
 
-## 7. CI/CD 자동 배포 (GitHub Actions)
+## 8. CI/CD 자동 배포 (GitHub Actions)
 
 `main` 브랜치에 push하면 자동으로 테스트 → 빌드 → AWS 배포까지 실행됩니다.
 
@@ -307,7 +443,7 @@ main 브랜치에 push
 
 ---
 
-## 8. 자주 쓰는 명령어
+## 9. 자주 쓰는 명령어
 
 ```bash
 # 전체 재시작
@@ -329,7 +465,7 @@ docker-compose up -d --build backend
 
 ---
 
-## 9. 프로젝트 구조
+## 10. 프로젝트 구조
 
 ```
 sp-connect/
