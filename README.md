@@ -18,6 +18,7 @@
 10. [자주 쓰는 명령어](#10-자주-쓰는-명령어)
 11. [프로젝트 구조](#11-프로젝트-구조)
 12. [기술 스택](#12-기술-스택)
+13. [페이지 스크린샷](#13-페이지-스크린샷)
 
 ---
 
@@ -615,3 +616,40 @@ point-web/
 | 인증 | JWT, 카카오/네이버 OAuth, NICE 본인인증 |
 | 인프라 | Docker, AWS ECS Fargate, RDS, ElastiCache |
 | CI/CD | GitHub Actions |
+
+---
+
+## 13. 페이지 스크린샷
+
+> 📅 캡쳐 시점: **2026-03-06 08:43 KST**
+> 스크린샷 재생성: `node scripts/take-screenshots.js`
+
+### 회원 페이지
+
+#### 회원 로그인 (`/login`)
+![회원 로그인](docs/images/01_login.png)
+
+#### 회원 대시보드 (`/member/dashboard`)
+![회원 대시보드](docs/images/08_member_dashboard.png)
+
+---
+
+### 관리자 페이지
+
+#### 관리자 로그인 (`/admin/login`)
+![관리자 로그인](docs/images/02_admin_login.png)
+
+#### 관리자 대시보드 (`/admin/dashboard`)
+![관리자 대시보드](docs/images/03_admin_dashboard.png)
+
+#### 회원 관리 (`/admin/users`)
+![회원 관리](docs/images/04_admin_users.png)
+
+#### 포인트 이력 (`/admin/points`)
+![포인트 이력](docs/images/05_admin_points.png)
+
+#### 정책 설정 (`/admin/policies`)
+![정책 설정](docs/images/06_admin_policies.png)
+
+#### 연동 사이트 (`/admin/sites`)
+![연동 사이트](docs/images/07_admin_sites.png)

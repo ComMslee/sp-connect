@@ -1,0 +1,12 @@
+{
+  "name": "sp-connect-scripts",
+  "version": "1.0.0",
+  "description": "유틸리티 스크립트 (스크린샷 등)",
+  "private": true,
+  "scripts": {
+    "screenshots": "node scripts/take-screenshots.js"
+  },
+  "dependencies": {
+    "playwright": "^1.58.2"
+  }
+}
