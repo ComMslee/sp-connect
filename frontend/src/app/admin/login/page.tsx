@@ -29,6 +29,8 @@ export default function AdminLoginPage() {
     try {
       const res: any = await adminAuthApi.login(data.email, data.password);
       setAuth(res.data.admin, res.data.tokens.accessToken);
+      // middleware 라우트 보호용 쿠키 설정 (24시간)
+      document.cookie = 'admin_auth=1; path=/; max-age=86400; SameSite=Lax';
       router.replace('/admin/dashboard');
     } catch (e: any) {
       setError(e?.message || '로그인에 실패했습니다.');

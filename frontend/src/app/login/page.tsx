@@ -40,6 +40,8 @@ export default function LoginPage() {
     try {
       const res: any = await authApi.login(data.phone, data.password);
       setAuth(res.data.user, res.data.tokens.accessToken, res.data.tokens.refreshToken);
+      // middleware 라우트 보호용 쿠키 설정 (24시간)
+      document.cookie = 'member_auth=1; path=/; max-age=86400; SameSite=Lax';
       router.replace('/member/dashboard');
     } catch (e: any) {
       setError(e?.error?.message || '로그인에 실패했습니다.');
