@@ -131,91 +131,119 @@ docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
 
 ## 5. Docker 컨테이너 구성
 
-실행되는 컨테이너 5개의 상세 정보입니다.
+`docker-compose up -d`를 실행하면 **5개 컨테이너**가 순서대로 올라옵니다.
 
-### 컨테이너 목록
-
-| 컨테이너명 | 이미지 | 역할 | 내부 포트 | 외부 포트 |
-|------------|--------|------|-----------|-----------|
-| `point_postgres` | postgres:16-alpine | PostgreSQL 데이터베이스 | 5432 | 5432 |
-| `point_redis` | redis:7-alpine | 세션/캐시 저장소 | 6379 | 6379 |
-| `point_backend` | sp-connect-backend | NestJS API 서버 | 3000 | 3000 |
-| `point_frontend` | sp-connect-frontend | Next.js 웹 앱 | 3001 | 3001 |
-| `point_nginx` | nginx:alpine | 리버스 프록시 | 80, 443 | 80, 443 |
-
-### 컨테이너별 상세 정보
-
-#### point_postgres (PostgreSQL 16)
-- **DB명**: `pointdb`
-- **기본 사용자**: `postgres` (`.env`의 `DB_USERNAME`)
-- **데이터 영속**: `postgres_data` Docker 볼륨에 저장 (컨테이너 재시작해도 유지)
-- **초기화 스크립트**: 최초 실행 시 `database/init.sql` 자동 실행
-  - 테이블 생성, 기본 정책, 슈퍼관리자, 테스트 계정 10개 삽입
-- **직접 접속**: `docker exec -it point_postgres psql -U postgres -d pointdb`
-- **헬스체크**: `pg_isready` 10초마다 확인
-
-#### point_redis (Redis 7)
-- **용도**: 리프레시 토큰 저장, 향후 캐시 활용
-- **인증**: `REDIS_PASSWORD` 환경변수로 비밀번호 설정 (기본: `redis_secret`)
-- **데이터 영속**: `redis_data` Docker 볼륨 (AOF 비활성 - 재시작 시 휘발)
-- **직접 접속**: `docker exec -it point_redis redis-cli -a redis_secret`
-- **헬스체크**: `redis-cli ping` 10초마다 확인
-
-#### point_backend (NestJS API)
-- **빌드**: `backend/Dockerfile` 멀티 스테이지 빌드 (builder → runner)
-- **포트**: `3000` → `/api/v1/*` 경로로 모든 REST API 제공
-- **Swagger**: `http://localhost:3000/api/docs` (개발/스테이징 환경에서만 활성화)
-- **로그**: `backend_logs` Docker 볼륨 (`/app/logs/`)에 파일 저장
-- **의존성**: postgres, redis 헬시 상태 확인 후 시작
-- **환경변수**: JWT 시크릿, DB 접속 정보, 소셜 로그인 키 등 `.env`에서 주입
-- **헬스체크**: `GET /api/v1` 응답 확인 (30초 주기)
-
-#### point_frontend (Next.js 14)
-- **빌드**: `frontend/Dockerfile` 멀티 스테이지 빌드 (standalone 모드)
-- **포트**: `3001` → 회원/관리자 웹 화면
-- **API 연동**: `NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1`
-- **인증**: Zustand + localStorage persist (회원/관리자 토큰 분리 관리)
-- **헬스체크**: `http://127.0.0.1:3001` 응답 확인 (30초 주기)
-
-#### point_nginx (Nginx)
-- **역할**: 리버스 프록시 및 정적 파일 서빙
-- **설정파일**: `infra/nginx/nginx.conf`
-- **포트 80**: HTTP → 프론트엔드/백엔드 라우팅
-- **포트 443**: HTTPS (인증서 연결 시 활성화, `infra/nginx/certs/` 디렉토리 필요)
-- **네트워크**: `point_network` Docker 네트워크에서 컨테이너명으로 통신
-
-### 컨테이너 간 통신
+### 전체 구조
 
 ```
-브라우저
-  │
-  ├─► :80/:443 → point_nginx
-  │       ├─► point_frontend:3001  (웹 페이지)
-  │       └─► point_backend:3000   (API 요청)
-  │
-  └─► :3000 → point_backend (직접 접근 가능, Swagger 포함)
-      └─► point_postgres:5432
-      └─► point_redis:6379
+        사용자 (브라우저)
+               │
+               │ http://localhost
+               ▼
+       ┌───────────────┐
+       │  ⑤  Nginx    │  ← 입구에서 요청을 알맞은 곳으로 안내
+       └───┬───────┬───┘
+           │       │
+      웹화면│       │API 요청 (/api/*)
+           ▼       ▼
+    ┌─────────┐  ┌───────────────┐
+    │ ④ Front │  │  ③ Backend   │  ← 직접 접속도 가능
+    │  (화면) │  │  (비즈니스)  │    :3000/api/docs (Swagger)
+    │  :3001  │  └───┬───────┬───┘
+    └─────────┘      │       │
+                 DB  │       │  캐시
+                저장 │       │ 저장
+                     ▼       ▼
+              ┌──────────┐ ┌──────────┐
+              │ ① Postgres│ │ ② Redis  │
+              │ (데이터베이스)│ │ (캐시)   │
+              │  :5432   │ │  :6379   │
+              └──────────┘ └──────────┘
 ```
 
-> **컨테이너 내부 통신**: Docker 네트워크(`point_network`) 내에서 서비스명으로 통신합니다.
-> 예: 백엔드에서 DB 접속 시 `localhost` 아닌 `postgres` 호스트명 사용.
+> **시작 순서**: ①②가 준비되면 → ③ 시작 → ③④가 준비되면 → ⑤ 시작
 
-### 데이터 볼륨
+### 컨테이너 역할 요약
+
+| # | 컨테이너 | 한 줄 설명 | 접속 포트 |
+|---|----------|-----------|-----------|
+| ① | `point_postgres` | 📦 모든 데이터를 영구 저장하는 데이터베이스 | 5432 |
+| ② | `point_redis` | ⚡ 로그인 토큰을 빠르게 저장하는 캐시 | 6379 |
+| ③ | `point_backend` | 🔧 로그인·포인트 등 모든 기능을 처리하는 API 서버 | 3000 |
+| ④ | `point_frontend` | 🖥️ 회원·관리자가 사용하는 웹 화면 | 3001 |
+| ⑤ | `point_nginx` | 🚦 요청을 ③④로 나눠 전달하는 관문 | 80, 443 |
+
+---
+
+### ① point_postgres — 데이터베이스
+
+회원 정보, 포인트 이력, 적립 정책 등 **모든 데이터를 영구 저장**합니다.
+컨테이너를 재시작하거나 껐다 켜도 데이터는 그대로 유지됩니다.
+
+- **DB 이름**: `pointdb`
+- **첫 실행 시**: `database/init.sql`이 자동으로 실행되어 테이블과 테스트 계정 10개가 생성됩니다.
+- **데이터 저장**: `postgres_data` 볼륨 (컨테이너 삭제해도 유지)
 
 ```bash
-# 볼륨 목록 확인
-docker volume ls | grep sp-connect
-
-# 볼륨 위치 확인 (Windows: Docker Desktop 가상머신 내부)
-docker volume inspect sp-connect_postgres_data
+# DB에 직접 들어가서 SQL 실행하기
+docker exec -it point_postgres psql -U postgres -d pointdb
 ```
 
-| 볼륨명 | 마운트 위치 | 내용 |
-|--------|-------------|------|
-| `sp-connect_postgres_data` | `/var/lib/postgresql/data` | DB 데이터 (영구 보존) |
-| `sp-connect_redis_data` | `/data` | Redis 데이터 (재시작 시 휘발) |
-| `sp-connect_backend_logs` | `/app/logs` | 백엔드 로그 파일 |
+---
+
+### ② point_redis — 캐시
+
+로그인 시 발급된 **리프레시 토큰을 임시 저장**합니다.
+컨테이너를 재시작하면 저장 내용이 사라집니다 → 사용자는 재로그인이 필요합니다.
+
+```bash
+# Redis에 직접 접속하기
+docker exec -it point_redis redis-cli -a redis_secret
+```
+
+---
+
+### ③ point_backend — API 서버 (핵심)
+
+로그인, 포인트 적립/사용/조회 등 **모든 기능의 처리를 담당**합니다.
+DB(①)와 캐시(②)가 정상 기동된 후에 시작됩니다.
+
+- **API 주소**: `http://localhost:3000/api/v1`
+- **API 문서**: http://localhost:3000/api/docs (Swagger — 개발 시 유용)
+- **로그 저장**: `backend_logs` 볼륨
+
+---
+
+### ④ point_frontend — 웹 화면
+
+회원과 관리자가 사용하는 **웹 페이지를 제공**합니다.
+
+- **회원 로그인**: http://localhost:3001/login
+- **관리자 로그인**: http://localhost:3001/admin/login
+
+---
+
+### ⑤ point_nginx — 관문 (리버스 프록시)
+
+브라우저에서 들어오는 모든 요청을 받아 **알맞은 컨테이너로 전달**합니다.
+
+- `/api/*` 경로 → **백엔드(③)**로 전달
+- 그 외 모든 경로 → **프론트엔드(④)**로 전달
+
+덕분에 사용자는 포트 번호 없이 `http://localhost` 하나로 접속할 수 있습니다.
+
+---
+
+### 데이터 저장 위치 (볼륨)
+
+`docker-compose down`만으로는 데이터가 사라지지 않습니다.
+완전히 초기화하려면 `docker-compose down -v`를 사용하세요.
+
+| 볼륨 | 저장 내용 | `down -v` 시 영향 |
+|------|-----------|-------------------|
+| `postgres_data` | 회원·포인트 전체 데이터 | ⚠️ 모든 데이터 삭제 |
+| `redis_data` | 로그인 토큰 (임시) | 재로그인 필요 |
+| `backend_logs` | 서버 로그 파일 | 로그 기록 삭제 |
 
 ---
 
