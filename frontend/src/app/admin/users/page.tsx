@@ -1,7 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '../../../utils/api';
+import { useAuthStore } from '../../../store/auth.store';
 import { User, PaginatedResult } from '../../../types';
 import dayjs from 'dayjs';
 
@@ -16,6 +18,13 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function AdminUsersPage() {
+  const { isAuthenticated } = useAuthStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isAuthenticated) router.replace('/login');
+  }, [isAuthenticated, router]);
+
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');

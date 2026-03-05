@@ -5,7 +5,7 @@ FROM node:20-alpine AS deps
 
 WORKDIR /app
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 # ────────────────────────────────────────────────
 # Stage 2: 빌드
@@ -21,7 +21,7 @@ ARG NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+RUN mkdir -p /app/public && npm run build
 
 # ────────────────────────────────────────────────
 # Stage 3: 런타임
@@ -42,8 +42,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 USER nextjs
 EXPOSE 3001
 ENV PORT=3001
+ENV HOSTNAME=0.0.0.0
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
-  CMD wget -qO- http://localhost:3001 || exit 1
+  CMD wget -qO- http://127.0.0.1:3001 || exit 1
 
 CMD ["node", "server.js"]

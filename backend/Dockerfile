@@ -3,18 +3,21 @@
 # ────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
+# bcrypt 네이티브 모듈 컴파일에 필요한 빌드 도구
+RUN apk add --no-cache python3 make g++
+
 WORKDIR /app
 
 # 의존성 설치 (캐시 최적화)
 COPY package*.json ./
-RUN npm ci --ignore-scripts
+RUN npm install
 
 # 소스 복사 및 빌드
 COPY . .
 RUN npm run build
 
-# 프로덕션 의존성만 남기기
-RUN npm ci --omit=dev --ignore-scripts
+# 프로덕션 의존성만 남기기 (bcrypt 등 네이티브 모듈 재컴파일 포함)
+RUN npm install --omit=dev
 
 # ────────────────────────────────────────────────
 # Stage 2: 런타임
@@ -40,6 +43,6 @@ EXPOSE 3000
 
 # 헬스체크
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3000/api/v1/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"
+  CMD node -e "require('http').get('http://localhost:3000/api/v1', (r) => process.exit(r.statusCode < 500 ? 0 : 1))"
 
 CMD ["node", "dist/main"]

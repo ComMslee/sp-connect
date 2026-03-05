@@ -51,7 +51,7 @@ export class PointsService {
       const balanceAfter = balanceBefore + dto.amount;
 
       // 3. 만료일 계산 (policy 기반 또는 직접 지정)
-      let expiresAt: Date | null = null;
+      let expiresAt: Date | undefined = undefined;
       if (dto.expiresAt) {
         expiresAt = new Date(dto.expiresAt);
       }
@@ -156,6 +156,7 @@ export class PointsService {
         .where('u.id = :id', { id: userId })
         .getOne();
 
+      if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
       let balanceBefore = user.pointBalance;
       let balanceAfter: number;
       let cancelType: TransactionType;

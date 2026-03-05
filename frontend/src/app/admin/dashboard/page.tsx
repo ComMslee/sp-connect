@@ -1,7 +1,9 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { adminApi } from '../../../utils/api';
+import { useAuthStore } from '../../../store/auth.store';
 import { DashboardStats } from '../../../types';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line,
@@ -18,6 +20,13 @@ const StatCard = ({ title, value, unit = '', color = 'text-gray-900' }: any) => 
 );
 
 export default function AdminDashboardPage() {
+  const { isAuthenticated } = useAuthStore();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isAuthenticated) router.replace('/login');
+  }, [isAuthenticated, router]);
+
   const [period, setPeriod] = useState({ startDate: '', endDate: '' });
 
   const { data: statsRes, isLoading } = useQuery({
