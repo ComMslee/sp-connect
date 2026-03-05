@@ -17,8 +17,7 @@
 9. [CI/CD 자동 배포](#9-cicd-자동-배포-github-actions)
 10. [자주 쓰는 명령어](#10-자주-쓰는-명령어)
 11. [프로젝트 구조](#11-프로젝트-구조)
-
-
+12. [기술 스택](#12-기술-스택)
 
 ---
 
@@ -58,8 +57,8 @@ docker --version
 ## 2. 프로젝트 받기
 
 ```bash
-git clone https://github.com/ComMslee/sp-connect.git
-cd sp-connect
+git clone https://github.com/ComMslee/point-web.git
+cd point-web
 ```
 
 ---
@@ -115,17 +114,7 @@ point_frontend   Up (healthy)
 point_nginx      Up
 ```
 
-백엔드 로그 확인 (문제가 있을 때):
-```bash
-docker-compose logs -f backend
-docker-compose logs -f frontend
-```
-
-서비스 종료:
-```bash
-docker-compose down          # 종료 (데이터 유지)
-docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
-```
+> 로그 확인, 재시작, 종료 등 자주 쓰는 명령어는 [10절](#10-자주-쓰는-명령어)을 참고하세요.
 
 ---
 
@@ -152,7 +141,7 @@ docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
     │  :3001  │  └───┬───────┬───┘
     └─────────┘      │       │
                  DB  │       │  캐시
-                저장 │       │ 저장
+                저장 │       │  저장
                      ▼       ▼
               ┌──────────┐ ┌──────────┐
               │ ① Postgres│ │ ② Redis  │
@@ -184,24 +173,10 @@ docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
 - **첫 실행 시**: `database/init.sql`이 자동으로 실행되어 테이블과 테스트 계정 10개가 생성됩니다.
 - **데이터 저장**: `postgres_data` 볼륨 (컨테이너 삭제해도 유지)
 
-```bash
-# DB에 직접 들어가서 SQL 실행하기
-docker exec -it point_postgres psql -U postgres -d pointdb
-```
-
----
-
 ### ② point_redis — 캐시
 
 로그인 시 발급된 **리프레시 토큰을 임시 저장**합니다.
 컨테이너를 재시작하면 저장 내용이 사라집니다 → 사용자는 재로그인이 필요합니다.
-
-```bash
-# Redis에 직접 접속하기
-docker exec -it point_redis redis-cli -a redis_secret
-```
-
----
 
 ### ③ point_backend — API 서버 (핵심)
 
@@ -212,16 +187,10 @@ DB(①)와 캐시(②)가 정상 기동된 후에 시작됩니다.
 - **API 문서**: http://localhost:3000/api/docs (Swagger — 개발 시 유용)
 - **로그 저장**: `backend_logs` 볼륨
 
----
-
 ### ④ point_frontend — 웹 화면
 
 회원과 관리자가 사용하는 **웹 페이지를 제공**합니다.
-
-- **회원 로그인**: http://localhost:3001/login
-- **관리자 로그인**: http://localhost:3001/admin/login
-
----
+접속 주소는 [6절](#6-접속-주소-및-기본-계정)을 참고하세요.
 
 ### ⑤ point_nginx — 관문 (리버스 프록시)
 
@@ -287,49 +256,38 @@ DB(①)와 캐시(②)가 정상 기동된 후에 시작됩니다.
 AWS 없이 **일반 리눅스 서버 (VPS, 사내 서버, 클라우드 VM 등)** 에도 그대로 올릴 수 있습니다.
 로컬 실행과 방식이 동일하고, 도메인/HTTPS만 추가로 설정하면 됩니다.
 
-### 6-1. 서버 준비
+### 7-1. 서버 준비
 
 Ubuntu 22.04 기준 (타 리눅스도 동일):
 
 ```bash
-# 서버에 SSH 접속 후 Docker 설치
+# 서버에 SSH 접속 후 Docker + Git 설치
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER
 newgrp docker
-
-# Git 설치
 sudo apt install -y git
 ```
 
-### 6-2. 코드 받고 실행
+### 7-2. 코드 받고 실행
 
 ```bash
-# 프로젝트 클론
-git clone https://github.com/ComMslee/sp-connect.git
-cd sp-connect
-
-# 환경 변수 설정
+git clone https://github.com/ComMslee/point-web.git
+cd point-web
 cp .env.example .env
 nano .env   # DB_PASSWORD, JWT_SECRET 수정
-```
-
-```bash
-# 실행 (로컬과 동일)
 docker-compose up -d
-
-# 상태 확인
 docker-compose ps
 ```
 
-이것만으로 서버에서 동작합니다. 서버 IP로 접속 가능:
+서버 IP로 접속 가능:
 ```
-http://서버IP:3001       # 프론트엔드
+http://서버IP:3001           # 프론트엔드
 http://서버IP:3000/api/docs  # Swagger
 ```
 
 ---
 
-### 6-3. 도메인 + HTTPS 설정 (선택사항)
+### 7-3. 도메인 + HTTPS 설정 (선택사항)
 
 도메인이 있다면 **Certbot(무료 SSL)** 으로 HTTPS를 적용할 수 있습니다.
 
@@ -345,7 +303,6 @@ docker-compose start nginx
 
 발급된 인증서를 Nginx에 연결:
 ```bash
-# 인증서 위치를 nginx가 읽을 수 있도록 복사
 sudo cp /etc/letsencrypt/live/yourdomain.com/fullchain.pem infra/nginx/certs/
 sudo cp /etc/letsencrypt/live/yourdomain.com/privkey.pem   infra/nginx/certs/
 ```
@@ -357,13 +314,11 @@ docker-compose restart nginx
 
 ---
 
-### 6-4. 서버 재부팅 시 자동 시작
+### 7-4. 서버 재부팅 시 자동 시작
 
 ```bash
-# 서버 켜질 때 자동으로 서비스 올라오게 설정
 sudo systemctl enable docker
 
-# docker-compose를 systemd 서비스로 등록
 sudo tee /etc/systemd/system/point-system.service > /dev/null <<EOF
 [Unit]
 Description=Point Management System
@@ -371,7 +326,7 @@ After=docker.service
 Requires=docker.service
 
 [Service]
-WorkingDirectory=/home/ubuntu/sp-connect
+WorkingDirectory=/home/ubuntu/point-web
 ExecStart=/usr/bin/docker compose up -d
 ExecStop=/usr/bin/docker compose down
 RemainAfterExit=yes
@@ -385,20 +340,13 @@ sudo systemctl enable point-system
 sudo systemctl start point-system
 ```
 
-이제 서버가 재부팅되어도 자동으로 실행됩니다.
-
 ---
 
-### 6-5. 코드 업데이트 방법
+### 7-5. 코드 업데이트 방법
 
-새 버전을 배포할 때:
 ```bash
-cd sp-connect
-
-# 최신 코드 받기
+cd point-web
 git pull
-
-# 이미지 다시 빌드 후 재시작
 docker-compose up -d --build
 ```
 
@@ -439,7 +387,7 @@ ALB (로드밸런서, HTTPS)
 
 ---
 
-### 6-1. AWS RDS 생성 (PostgreSQL DB)
+### 8-1. AWS RDS 생성 (PostgreSQL DB)
 
 AWS 콘솔 → **RDS** → **데이터베이스 생성**
 
@@ -460,7 +408,7 @@ psql -h [RDS엔드포인트] -U postgres -d pointdb -f database/init.sql
 
 ---
 
-### 6-2. ECR 이미지 저장소 생성
+### 8-2. ECR 이미지 저장소 생성
 
 ```bash
 aws ecr create-repository --repository-name point-backend  --region ap-northeast-2
@@ -469,7 +417,7 @@ aws ecr create-repository --repository-name point-frontend --region ap-northeast
 
 ---
 
-### 6-3. 보안 그룹 설정
+### 8-3. 보안 그룹 설정
 
 각 서비스가 필요한 포트만 열어야 합니다:
 
@@ -484,7 +432,7 @@ aws ecr create-repository --repository-name point-frontend --region ap-northeast
 
 ---
 
-### 6-4. Secrets Manager에 비밀 정보 저장
+### 8-4. Secrets Manager에 비밀 정보 저장
 
 DB 비밀번호, JWT 키 등은 환경 변수로 넣지 말고 Secrets Manager에 저장합니다:
 
@@ -504,7 +452,7 @@ ECS 태스크 정의의 `secrets` 항목에서 위 이름으로 참조합니다.
 
 ---
 
-### 6-5. ECS Fargate 서비스 생성
+### 8-5. ECS Fargate 서비스 생성
 
 ```bash
 # 클러스터 생성
@@ -523,7 +471,7 @@ aws ecs create-service \
 
 ---
 
-### 6-6. 수동 배포 (CI/CD 없이 직접 올리기)
+### 8-6. 수동 배포 (CI/CD 없이 직접 올리기)
 
 ```bash
 # 1) ECR 로그인
@@ -594,11 +542,20 @@ docker-compose restart backend
 docker-compose logs -f backend
 docker-compose logs -f frontend
 
-# DB 접속 (로컬)
-docker exec -it point_postgres psql -U postgres -d pointdb
+# 종료 (데이터 유지)
+docker-compose down
+
+# 종료 + DB 데이터까지 삭제 (초기화)
+docker-compose down -v
 
 # 이미지 새로 빌드 (코드 변경 후)
 docker-compose up -d --build backend
+
+# DB 직접 접속
+docker exec -it point_postgres psql -U postgres -d pointdb
+
+# Redis 직접 접속
+docker exec -it point_redis redis-cli -a redis_secret
 ```
 
 ---
@@ -606,7 +563,7 @@ docker-compose up -d --build backend
 ## 11. 프로젝트 구조
 
 ```
-sp-connect/
+point-web/
 ├── backend/                  # NestJS 백엔드 API 서버
 │   └── src/
 │       ├── auth/             # 로그인, 소셜 로그인, 본인인증
@@ -642,7 +599,7 @@ sp-connect/
 
 ---
 
-## 기술 스택
+## 12. 기술 스택
 
 | 영역 | 기술 |
 |------|------|
