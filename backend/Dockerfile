@@ -7,14 +7,14 @@ WORKDIR /app
 
 # 의존성 설치 (캐시 최적화)
 COPY package*.json ./
-RUN npm ci --ignore-scripts
+RUN npm install --ignore-scripts
 
 # 소스 복사 및 빌드
 COPY . .
 RUN npm run build
 
 # 프로덕션 의존성만 남기기
-RUN npm ci --omit=dev --ignore-scripts
+RUN npm install --omit=dev --ignore-scripts
 
 # ────────────────────────────────────────────────
 # Stage 2: 런타임
