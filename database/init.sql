@@ -226,3 +226,18 @@ VALUES
 INSERT INTO admins (username, email, password_hash, role)
 VALUES ('superadmin', 'admin@pointsystem.com',
         crypt('Admin@123!', gen_salt('bf', 12)), 'SUPER');
+
+-- ============================================================
+-- 테스트 계정 10개 (비밀번호: Test1234!)
+-- ============================================================
+INSERT INTO users (name, email, phone, password_hash, status, auth_provider, is_verified, point_balance) VALUES
+    ('테스트사용자1',  'test1@test.com',  '010-0000-0001', crypt('Test1234!', gen_salt('bf', 12)), 'ACTIVE', 'LOCAL', TRUE,      0),
+    ('테스트사용자2',  'test2@test.com',  '010-0000-0002', crypt('Test1234!', gen_salt('bf', 12)), 'ACTIVE', 'LOCAL', TRUE,      0),
+    ('테스트사용자3',  'test3@test.com',  '010-0000-0003', crypt('Test1234!', gen_salt('bf', 12)), 'ACTIVE', 'LOCAL', TRUE,      0),
+    ('테스트사용자4',  'test4@test.com',  '010-0000-0004', crypt('Test1234!', gen_salt('bf', 12)), 'ACTIVE', 'LOCAL', TRUE,   5000),
+    ('테스트사용자5',  'test5@test.com',  '010-0000-0005', crypt('Test1234!', gen_salt('bf', 12)), 'ACTIVE', 'LOCAL', TRUE,   5000),
+    ('테스트사용자6',  'test6@test.com',  '010-0000-0006', crypt('Test1234!', gen_salt('bf', 12)), 'ACTIVE', 'LOCAL', TRUE,   5000),
+    ('테스트사용자7',  'test7@test.com',  '010-0000-0007', crypt('Test1234!', gen_salt('bf', 12)), 'ACTIVE', 'LOCAL', TRUE,  15000),
+    ('테스트사용자8',  'test8@test.com',  '010-0000-0008', crypt('Test1234!', gen_salt('bf', 12)), 'ACTIVE', 'LOCAL', TRUE,  15000),
+    ('테스트사용자9',  'test9@test.com',  '010-0000-0009', crypt('Test1234!', gen_salt('bf', 12)), 'SUSPENDED', 'LOCAL', TRUE, 3000),
+    ('테스트사용자10', 'test10@test.com', '010-0000-0010', crypt('Test1234!', gen_salt('bf', 12)), 'ACTIVE', 'LOCAL', TRUE, 100000);
