@@ -10,12 +10,15 @@
 2. [프로젝트 받기](#2-프로젝트-받기)
 3. [환경 변수 설정](#3-환경-변수-설정)
 4. [실행하기](#4-실행하기)
-5. [접속 주소 및 기본 계정](#5-접속-주소-및-기본-계정)
-6. [테스트 서버 배포 (Docker Compose)](#6-테스트-서버-배포-docker-compose)
-7. [AWS 배포 가이드](#7-aws-배포-가이드)
-8. [CI/CD 자동 배포](#8-cicd-자동-배포-github-actions)
-9. [자주 쓰는 명령어](#9-자주-쓰는-명령어)
-10. [프로젝트 구조](#10-프로젝트-구조)
+5. [Docker 컨테이너 구성](#5-docker-컨테이너-구성)
+6. [접속 주소 및 기본 계정](#6-접속-주소-및-기본-계정)
+7. [테스트 서버 배포 (Docker Compose)](#7-테스트-서버-배포-docker-compose)
+8. [AWS 배포 가이드](#8-aws-배포-가이드)
+9. [CI/CD 자동 배포](#9-cicd-자동-배포-github-actions)
+10. [자주 쓰는 명령어](#10-자주-쓰는-명령어)
+11. [프로젝트 구조](#11-프로젝트-구조)
+
+
 
 ---
 
@@ -102,19 +105,20 @@ docker-compose up -d
 docker-compose ps
 ```
 
-아래처럼 모두 `Up` 상태이면 정상입니다:
+아래처럼 모두 `Up (healthy)` 상태이면 정상입니다:
 ```
-NAME               STATUS
-point_postgres     Up (healthy)
-point_redis        Up (healthy)
-point_backend      Up (healthy)
-point_frontend     Up
-point_nginx        Up
+NAME             STATUS
+point_postgres   Up (healthy)
+point_redis      Up (healthy)
+point_backend    Up (healthy)
+point_frontend   Up (healthy)
+point_nginx      Up
 ```
 
 백엔드 로그 확인 (문제가 있을 때):
 ```bash
 docker-compose logs -f backend
+docker-compose logs -f frontend
 ```
 
 서비스 종료:
@@ -125,7 +129,97 @@ docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
 
 ---
 
-## 5. 접속 주소 및 기본 계정
+## 5. Docker 컨테이너 구성
+
+실행되는 컨테이너 5개의 상세 정보입니다.
+
+### 컨테이너 목록
+
+| 컨테이너명 | 이미지 | 역할 | 내부 포트 | 외부 포트 |
+|------------|--------|------|-----------|-----------|
+| `point_postgres` | postgres:16-alpine | PostgreSQL 데이터베이스 | 5432 | 5432 |
+| `point_redis` | redis:7-alpine | 세션/캐시 저장소 | 6379 | 6379 |
+| `point_backend` | sp-connect-backend | NestJS API 서버 | 3000 | 3000 |
+| `point_frontend` | sp-connect-frontend | Next.js 웹 앱 | 3001 | 3001 |
+| `point_nginx` | nginx:alpine | 리버스 프록시 | 80, 443 | 80, 443 |
+
+### 컨테이너별 상세 정보
+
+#### point_postgres (PostgreSQL 16)
+- **DB명**: `pointdb`
+- **기본 사용자**: `postgres` (`.env`의 `DB_USERNAME`)
+- **데이터 영속**: `postgres_data` Docker 볼륨에 저장 (컨테이너 재시작해도 유지)
+- **초기화 스크립트**: 최초 실행 시 `database/init.sql` 자동 실행
+  - 테이블 생성, 기본 정책, 슈퍼관리자, 테스트 계정 10개 삽입
+- **직접 접속**: `docker exec -it point_postgres psql -U postgres -d pointdb`
+- **헬스체크**: `pg_isready` 10초마다 확인
+
+#### point_redis (Redis 7)
+- **용도**: 리프레시 토큰 저장, 향후 캐시 활용
+- **인증**: `REDIS_PASSWORD` 환경변수로 비밀번호 설정 (기본: `redis_secret`)
+- **데이터 영속**: `redis_data` Docker 볼륨 (AOF 비활성 - 재시작 시 휘발)
+- **직접 접속**: `docker exec -it point_redis redis-cli -a redis_secret`
+- **헬스체크**: `redis-cli ping` 10초마다 확인
+
+#### point_backend (NestJS API)
+- **빌드**: `backend/Dockerfile` 멀티 스테이지 빌드 (builder → runner)
+- **포트**: `3000` → `/api/v1/*` 경로로 모든 REST API 제공
+- **Swagger**: `http://localhost:3000/api/docs` (개발/스테이징 환경에서만 활성화)
+- **로그**: `backend_logs` Docker 볼륨 (`/app/logs/`)에 파일 저장
+- **의존성**: postgres, redis 헬시 상태 확인 후 시작
+- **환경변수**: JWT 시크릿, DB 접속 정보, 소셜 로그인 키 등 `.env`에서 주입
+- **헬스체크**: `GET /api/v1` 응답 확인 (30초 주기)
+
+#### point_frontend (Next.js 14)
+- **빌드**: `frontend/Dockerfile` 멀티 스테이지 빌드 (standalone 모드)
+- **포트**: `3001` → 회원/관리자 웹 화면
+- **API 연동**: `NEXT_PUBLIC_API_URL=http://localhost:3000/api/v1`
+- **인증**: Zustand + localStorage persist (회원/관리자 토큰 분리 관리)
+- **헬스체크**: `http://127.0.0.1:3001` 응답 확인 (30초 주기)
+
+#### point_nginx (Nginx)
+- **역할**: 리버스 프록시 및 정적 파일 서빙
+- **설정파일**: `infra/nginx/nginx.conf`
+- **포트 80**: HTTP → 프론트엔드/백엔드 라우팅
+- **포트 443**: HTTPS (인증서 연결 시 활성화, `infra/nginx/certs/` 디렉토리 필요)
+- **네트워크**: `point_network` Docker 네트워크에서 컨테이너명으로 통신
+
+### 컨테이너 간 통신
+
+```
+브라우저
+  │
+  ├─► :80/:443 → point_nginx
+  │       ├─► point_frontend:3001  (웹 페이지)
+  │       └─► point_backend:3000   (API 요청)
+  │
+  └─► :3000 → point_backend (직접 접근 가능, Swagger 포함)
+      └─► point_postgres:5432
+      └─► point_redis:6379
+```
+
+> **컨테이너 내부 통신**: Docker 네트워크(`point_network`) 내에서 서비스명으로 통신합니다.
+> 예: 백엔드에서 DB 접속 시 `localhost` 아닌 `postgres` 호스트명 사용.
+
+### 데이터 볼륨
+
+```bash
+# 볼륨 목록 확인
+docker volume ls | grep sp-connect
+
+# 볼륨 위치 확인 (Windows: Docker Desktop 가상머신 내부)
+docker volume inspect sp-connect_postgres_data
+```
+
+| 볼륨명 | 마운트 위치 | 내용 |
+|--------|-------------|------|
+| `sp-connect_postgres_data` | `/var/lib/postgresql/data` | DB 데이터 (영구 보존) |
+| `sp-connect_redis_data` | `/data` | Redis 데이터 (재시작 시 휘발) |
+| `sp-connect_backend_logs` | `/app/logs` | 백엔드 로그 파일 |
+
+---
+
+## 6. 접속 주소 및 기본 계정
 
 실행 후 브라우저에서 접속하세요:
 
@@ -160,7 +254,7 @@ docker-compose down -v       # 종료 + DB 데이터까지 삭제 (초기화)
 
 ---
 
-## 6. 테스트 서버 배포 (Docker Compose)
+## 7. 테스트 서버 배포 (Docker Compose)
 
 AWS 없이 **일반 리눅스 서버 (VPS, 사내 서버, 클라우드 VM 등)** 에도 그대로 올릴 수 있습니다.
 로컬 실행과 방식이 동일하고, 도메인/HTTPS만 추가로 설정하면 됩니다.
@@ -295,7 +389,7 @@ docker-compose up -d --build
 
 ---
 
-## 7. AWS 배포 가이드
+## 8. AWS 배포 가이드
 
 ### 전체 구조
 
@@ -427,7 +521,7 @@ aws ecs update-service \
 
 ---
 
-## 8. CI/CD 자동 배포 (GitHub Actions)
+## 9. CI/CD 자동 배포 (GitHub Actions)
 
 `main` 브랜치에 push하면 자동으로 테스트 → 빌드 → AWS 배포까지 실행됩니다.
 
@@ -459,7 +553,7 @@ main 브랜치에 push
 
 ---
 
-## 9. 자주 쓰는 명령어
+## 10. 자주 쓰는 명령어
 
 ```bash
 # 전체 재시작
@@ -481,7 +575,7 @@ docker-compose up -d --build backend
 
 ---
 
-## 10. 프로젝트 구조
+## 11. 프로젝트 구조
 
 ```
 sp-connect/
