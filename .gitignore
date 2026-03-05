@@ -35,3 +35,9 @@ infra/nginx/certs/
 
 # TypeScript
 *.tsbuildinfo
+
+# npm lock (루트에 package.json 없음 — 각 서비스 디렉터리에서만 관리)
+/package-lock.json
+
+# Claude Code 설정 (로컬 전용)
+.claude/

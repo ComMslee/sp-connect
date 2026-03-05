@@ -225,6 +225,10 @@ DB(①)와 캐시(②)가 정상 기동된 후에 시작됩니다.
 | 회원 로그인 | http://localhost:3001/login |
 | 관리자 로그인 | http://localhost:3001/admin/login |
 | 관리자 대시보드 | http://localhost:3001/admin/dashboard |
+| 관리자 회원관리 | http://localhost:3001/admin/users |
+| 관리자 포인트이력 | http://localhost:3001/admin/points |
+| 관리자 정책설정 | http://localhost:3001/admin/policies |
+| 관리자 연동사이트 | http://localhost:3001/admin/sites |
 | API 문서 (Swagger) | http://localhost:3000/api/docs |
 
 **기본 관리자 계정**
@@ -578,13 +582,16 @@ point-web/
 │       ├── register/         # 회원가입 (준비 중 - NICE 본인인증 연동 예정)
 │       ├── member/           # 회원용 화면 (로그인 필요)
 │       │   ├── dashboard/    # 포인트 현황
-│       │   ├── earn/         # 포인트 적립 (준비 중)
-│       │   ├── use/          # 포인트 사용 (준비 중)
-│       │   └── history/      # 포인트 내역 (준비 중)
+│       │   ├── earn/         # 포인트 적립 (준비 중 - UI stub)
+│       │   ├── use/          # 포인트 사용 (준비 중 - UI stub)
+│       │   └── history/      # 포인트 내역 (준비 중 - UI stub)
 │       └── admin/            # 관리자 화면 (관리자 로그인 필요)
 │           ├── login/        # 관리자 로그인
-│           ├── dashboard/    # 대시보드
-│           └── users/        # 회원관리
+│           ├── dashboard/    # 대시보드 (통계, 차트)
+│           ├── users/        # 회원관리 (상태변경, 포인트 수동지급)
+│           ├── points/       # 포인트 이력 (유형/출처/기간 필터)
+│           ├── policies/     # 정책 설정 (만료일수, 기본정책)
+│           └── sites/        # 연동 사이트 (API 키 발급/관리)
 │
 ├── database/
 │   └── init.sql              # DB 테이블 생성 스크립트
