@@ -20,21 +20,24 @@ export default function MemberDashboardPage() {
   const { user, isAuthenticated, _hasHydrated, clearAuth } = useAuthStore();
   const router = useRouter();
 
-  useEffect(() => {
-    if (_hasHydrated && !isAuthenticated) router.replace('/login');
-  }, [_hasHydrated, isAuthenticated, router]);
-
   const { data: balanceData } = useQuery({
     queryKey: ['balance'],
     queryFn: () => pointsApi.getBalance(),
-    enabled: isAuthenticated,
+    enabled: _hasHydrated && isAuthenticated,
   });
 
   const { data: historyData } = useQuery({
     queryKey: ['history'],
     queryFn: () => pointsApi.getHistory({ page: 1, limit: 10 }),
-    enabled: isAuthenticated,
+    enabled: _hasHydrated && isAuthenticated,
   });
+
+  useEffect(() => {
+    if (_hasHydrated && !isAuthenticated) router.replace('/login');
+  }, [_hasHydrated, isAuthenticated, router]);
+
+  // hydration 완료 전 또는 미인증 상태: 빈 화면 (콘텐츠 노출 방지)
+  if (!_hasHydrated || !isAuthenticated) return null;
 
   const balance = (balanceData as any)?.data?.balance ?? user?.pointBalance ?? 0;
   const history: PointTransaction[] = (historyData as any)?.data?.items ?? [];

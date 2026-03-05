@@ -22,17 +22,20 @@ const StatCard = ({ title, value, unit = '', color = 'text-gray-900' }: any) => 
 export default function AdminDashboardPage() {
   const { isAuthenticated, _hasHydrated } = useAdminAuthStore();
   const router = useRouter();
-
-  useEffect(() => {
-    if (_hasHydrated && !isAuthenticated) router.replace('/admin/login');
-  }, [_hasHydrated, isAuthenticated, router]);
-
   const [period, setPeriod] = useState({ startDate: '', endDate: '' });
 
   const { data: statsRes, isLoading } = useQuery({
     queryKey: ['admin-dashboard', period],
     queryFn: () => adminApi.getDashboard(period),
+    enabled: _hasHydrated && isAuthenticated, // 인증 완료 전 API 호출 차단
   });
+
+  useEffect(() => {
+    if (_hasHydrated && !isAuthenticated) router.replace('/admin/login');
+  }, [_hasHydrated, isAuthenticated, router]);
+
+  // hydration 완료 전 또는 미인증 상태: 빈 화면 (콘텐츠 노출 방지)
+  if (!_hasHydrated || !isAuthenticated) return null;
 
   const stats: DashboardStats | undefined = (statsRes as any)?.data;
 

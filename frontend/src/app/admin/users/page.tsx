@@ -20,11 +20,6 @@ const STATUS_LABEL: Record<string, string> = {
 export default function AdminUsersPage() {
   const { isAuthenticated, _hasHydrated } = useAdminAuthStore();
   const router = useRouter();
-
-  useEffect(() => {
-    if (_hasHydrated && !isAuthenticated) router.replace('/admin/login');
-  }, [_hasHydrated, isAuthenticated, router]);
-
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
@@ -35,7 +30,15 @@ export default function AdminUsersPage() {
   const { data: res, isLoading } = useQuery({
     queryKey: ['admin-users', page, search, status],
     queryFn: () => adminApi.getUsers({ page, limit: 20, search, status }),
+    enabled: _hasHydrated && isAuthenticated, // 인증 완료 전 API 호출 차단
   });
+
+  useEffect(() => {
+    if (_hasHydrated && !isAuthenticated) router.replace('/admin/login');
+  }, [_hasHydrated, isAuthenticated, router]);
+
+  // hydration 완료 전 또는 미인증 상태: 빈 화면 (콘텐츠 노출 방지)
+  if (!_hasHydrated || !isAuthenticated) return null;
 
   const result: PaginatedResult<User> = (res as any)?.data ?? { items: [], total: 0, totalPages: 1 };
 

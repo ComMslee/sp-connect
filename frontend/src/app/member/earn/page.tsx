@@ -11,6 +11,8 @@ export default function MemberEarnPage() {
     if (_hasHydrated && !isAuthenticated) router.replace('/login');
   }, [_hasHydrated, isAuthenticated, router]);
 
+  if (!_hasHydrated || !isAuthenticated) return null;
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
       <div className="card max-w-md w-full text-center space-y-4">

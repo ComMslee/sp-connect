@@ -39,17 +39,18 @@ apiClient.interceptors.response.use(
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
-      const refreshToken = localStorage.getItem('refreshToken');
+      // Zustand persist 저장소에서 refreshToken 읽기
+      const { refreshToken } = useAuthStore.getState();
       if (refreshToken) {
         try {
           const res = await axios.post(`${API_BASE}/auth/refresh`, { refreshToken });
           const { accessToken, refreshToken: newRefresh } = res.data.data.tokens;
-          localStorage.setItem('accessToken', accessToken);
-          localStorage.setItem('refreshToken', newRefresh);
+          // localStorage 직접 쓰기 대신 Zustand store 업데이트 (persist가 localStorage 동기화)
+          useAuthStore.getState().setTokens(accessToken, newRefresh);
           originalRequest.headers.Authorization = `Bearer ${accessToken}`;
           return apiClient(originalRequest);
         } catch {
-          localStorage.clear();
+          useAuthStore.getState().clearAuth();
           window.location.href = '/login';
         }
       }
