@@ -18,12 +18,12 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default function AdminUsersPage() {
-  const { isAuthenticated } = useAdminAuthStore();
+  const { isAuthenticated, _hasHydrated } = useAdminAuthStore();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) router.replace('/admin/login');
-  }, [isAuthenticated, router]);
+    if (_hasHydrated && !isAuthenticated) router.replace('/admin/login');
+  }, [_hasHydrated, isAuthenticated, router]);
 
   const queryClient = useQueryClient();
   const [page, setPage] = useState(1);

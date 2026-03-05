@@ -8,9 +8,26 @@ export const apiClient: AxiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Zustand persist 저장소에서 토큰 읽기
+const getMemberToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('auth-storage');
+    return raw ? JSON.parse(raw)?.state?.accessToken ?? null : null;
+  } catch { return null; }
+};
+
+const getAdminToken = (): string | null => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('admin-auth-storage');
+    return raw ? JSON.parse(raw)?.state?.accessToken ?? null : null;
+  } catch { return null; }
+};
+
 // 요청 인터셉터 - JWT 자동 첨부
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const token = getMemberToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
@@ -71,7 +88,7 @@ export const adminApiClient: AxiosInstance = axios.create({
 });
 
 adminApiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('adminAccessToken') : null;
+  const token = getAdminToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });

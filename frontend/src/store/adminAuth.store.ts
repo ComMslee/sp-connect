@@ -12,8 +12,10 @@ interface AdminAuthState {
   admin: Admin | null;
   accessToken: string | null;
   isAuthenticated: boolean;
+  _hasHydrated: boolean;
   setAuth: (admin: Admin, accessToken: string) => void;
   clearAuth: () => void;
+  setHasHydrated: (value: boolean) => void;
 }
 
 export const useAdminAuthStore = create<AdminAuthState>()(
@@ -22,21 +24,18 @@ export const useAdminAuthStore = create<AdminAuthState>()(
       admin: null,
       accessToken: null,
       isAuthenticated: false,
-      setAuth: (admin, accessToken) => {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem('adminAccessToken', accessToken);
-        }
-        set({ admin, accessToken, isAuthenticated: true });
-      },
-      clearAuth: () => {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem('adminAccessToken');
-        }
-        set({ admin: null, accessToken: null, isAuthenticated: false });
-      },
+      _hasHydrated: false,
+      setAuth: (admin, accessToken) =>
+        set({ admin, accessToken, isAuthenticated: true }),
+      clearAuth: () =>
+        set({ admin: null, accessToken: null, isAuthenticated: false }),
+      setHasHydrated: (value) => set({ _hasHydrated: value }),
     }),
     {
       name: 'admin-auth-storage',
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
       partialize: (state) => ({
         admin: state.admin,
         accessToken: state.accessToken,

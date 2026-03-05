@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useAuthStore } from '../../../store/auth.store';
 import { pointsApi } from '../../../utils/api';
 import { PointTransaction } from '../../../types';
@@ -16,12 +17,12 @@ const TYPE_COLOR: Record<string, string> = {
 };
 
 export default function MemberDashboardPage() {
-  const { user, isAuthenticated, clearAuth } = useAuthStore();
+  const { user, isAuthenticated, _hasHydrated, clearAuth } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) router.replace('/login');
-  }, [isAuthenticated, router]);
+    if (_hasHydrated && !isAuthenticated) router.replace('/login');
+  }, [_hasHydrated, isAuthenticated, router]);
 
   const { data: balanceData } = useQuery({
     queryKey: ['balance'],
@@ -63,12 +64,12 @@ export default function MemberDashboardPage() {
 
         {/* 액션 버튼 */}
         <div className="grid grid-cols-2 gap-3 mt-6">
-          <a href="/member/earn" className="bg-white/20 hover:bg-white/30 rounded-xl py-3 text-center text-sm font-medium transition-colors">
+          <Link href="/member/earn" className="bg-white/20 hover:bg-white/30 rounded-xl py-3 text-center text-sm font-medium transition-colors">
             포인트 적립
-          </a>
-          <a href="/member/use" className="bg-white/20 hover:bg-white/30 rounded-xl py-3 text-center text-sm font-medium transition-colors">
+          </Link>
+          <Link href="/member/use" className="bg-white/20 hover:bg-white/30 rounded-xl py-3 text-center text-sm font-medium transition-colors">
             포인트 사용
-          </a>
+          </Link>
         </div>
       </div>
 
@@ -76,7 +77,7 @@ export default function MemberDashboardPage() {
       <div className="px-4 mt-6">
         <div className="flex justify-between items-center mb-4">
           <h2 className="font-bold text-gray-900">최근 이용내역</h2>
-          <a href="/member/history" className="text-primary text-sm">전체보기</a>
+          <Link href="/member/history" className="text-primary text-sm">전체보기</Link>
         </div>
 
         <div className="card space-y-0 p-0 overflow-hidden">

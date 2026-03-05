@@ -4,12 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '../../../store/auth.store';
 
 export default function MemberUsePage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, _hasHydrated } = useAuthStore();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) router.replace('/login');
-  }, [isAuthenticated, router]);
+    if (_hasHydrated && !isAuthenticated) router.replace('/login');
+  }, [_hasHydrated, isAuthenticated, router]);
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">

@@ -20,12 +20,12 @@ const StatCard = ({ title, value, unit = '', color = 'text-gray-900' }: any) => 
 );
 
 export default function AdminDashboardPage() {
-  const { isAuthenticated } = useAdminAuthStore();
+  const { isAuthenticated, _hasHydrated } = useAdminAuthStore();
   const router = useRouter();
 
   useEffect(() => {
-    if (!isAuthenticated) router.replace('/admin/login');
-  }, [isAuthenticated, router]);
+    if (_hasHydrated && !isAuthenticated) router.replace('/admin/login');
+  }, [_hasHydrated, isAuthenticated, router]);
 
   const [period, setPeriod] = useState({ startDate: '', endDate: '' });
 
