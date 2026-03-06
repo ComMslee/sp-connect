@@ -12,10 +12,11 @@ import { NaverStrategy } from './strategies/naver.strategy';
 import { User } from '../users/entities/user.entity';
 import { Admin } from '../admin/entities/admin.entity';
 import { RefreshToken } from './entities/refresh-token.entity';
+import { UserSocialProvider } from './entities/user-social-provider.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([User, Admin, RefreshToken]),
+    TypeOrmModule.forFeature([User, Admin, RefreshToken, UserSocialProvider]),
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],

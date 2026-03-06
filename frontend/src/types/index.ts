@@ -1,13 +1,19 @@
 export interface User {
   id: string;
   name: string;
-  phone: string;
-  email?: string;
+  email: string;           // 로그인 식별자 (필수)
+  phone: string;           // 본인인증으로 획득
   status: 'ACTIVE' | 'INACTIVE' | 'SUSPENDED' | 'DELETED';
   pointBalance: number;
   isVerified: boolean;
   authProvider: 'LOCAL' | 'KAKAO' | 'NAVER' | 'TELECOM';
   createdAt: string;
+}
+
+/** 소셜 연동 정보 (GET /auth/me/socials 응답) */
+export interface SocialProvider {
+  provider: 'KAKAO' | 'NAVER';
+  connectedAt: string;
 }
 
 export interface PointTransaction {

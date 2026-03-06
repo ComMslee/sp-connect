@@ -21,12 +21,11 @@ CREATE TYPE point_source AS ENUM ('SIGNUP_BONUS', 'PURCHASE', 'REVIEW', 'EVENT',
 CREATE TABLE users (
     id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name            VARCHAR(50)  NOT NULL,
-    email           VARCHAR(255) UNIQUE,
-    phone           VARCHAR(20)  UNIQUE NOT NULL,
-    password_hash   VARCHAR(255),                          -- 소셜 로그인 시 NULL 가능
+    email           VARCHAR(255) NOT NULL UNIQUE,          -- 로그인 식별자 (필수)
+    phone           VARCHAR(20)  NOT NULL UNIQUE,          -- 본인인증으로 획득
+    password_hash   VARCHAR(255) NOT NULL,                 -- 모든 회원 필수 (소셜도 비밀번호 보유)
     status          user_status  NOT NULL DEFAULT 'ACTIVE',
-    auth_provider   auth_provider NOT NULL DEFAULT 'LOCAL',
-    provider_id     VARCHAR(255),                          -- 소셜/통신사 고유 ID
+    auth_provider   auth_provider NOT NULL DEFAULT 'LOCAL', -- 항상 LOCAL (소셜은 user_social_providers)
     ci              VARCHAR(88)  UNIQUE,                   -- 본인인증 CI (88자 고정)
     di              VARCHAR(64),                           -- 중복가입 확인 DI
     is_verified     BOOLEAN      NOT NULL DEFAULT FALSE,   -- 본인인증 완료 여부
@@ -36,6 +35,7 @@ CREATE TABLE users (
     deleted_at      TIMESTAMPTZ
 );
 
+COMMENT ON COLUMN users.email IS '로그인 식별자 - 이메일+비밀번호 로그인';
 COMMENT ON COLUMN users.ci IS '통신사 본인인증 연계정보 - 동일인 식별 키';
 COMMENT ON COLUMN users.di IS '사이트별 중복가입 확인 정보';
 
@@ -152,6 +152,21 @@ CREATE TABLE refresh_tokens (
 );
 
 -- ============================================================
+-- 소셜 계정 연동 테이블 (카카오/네이버 → 기존 계정 연결)
+-- ============================================================
+CREATE TABLE user_social_providers (
+    id           UUID        PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id      UUID        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    provider     VARCHAR(10) NOT NULL,                     -- 'KAKAO' | 'NAVER'
+    provider_id  VARCHAR(255) NOT NULL,
+    connected_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_provider UNIQUE(provider, provider_id),  -- 동일 소셜 계정은 한 유저에만
+    CONSTRAINT uq_user_provider UNIQUE(user_id, provider)  -- 유저당 플랫폼별 하나
+);
+
+COMMENT ON TABLE user_social_providers IS '카카오/네이버 소셜 연동 - 기존 계정의 추가 로그인 수단';
+
+-- ============================================================
 -- 감사 로그 테이블
 -- ============================================================
 CREATE TABLE audit_logs (
@@ -172,8 +187,10 @@ CREATE TABLE audit_logs (
 -- ============================================================
 -- users
 CREATE INDEX idx_users_phone ON users(phone);
-CREATE INDEX idx_users_email ON users(email) WHERE email IS NOT NULL;
+CREATE INDEX idx_users_email ON users(email);
 CREATE INDEX idx_users_ci ON users(ci) WHERE ci IS NOT NULL;
+CREATE INDEX idx_usp_user_id ON user_social_providers(user_id);
+CREATE INDEX idx_usp_provider ON user_social_providers(provider, provider_id);
 CREATE INDEX idx_users_status ON users(status);
 
 -- point_transactions

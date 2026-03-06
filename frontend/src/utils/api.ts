@@ -63,15 +63,29 @@ apiClient.interceptors.response.use(
 
 // API 함수들
 export const authApi = {
-  login: (phone: string, password: string) =>
-    apiClient.post('/auth/login', { phone, password }),
+  /** 이메일+비밀번호 로그인 */
+  login: (email: string, password: string) =>
+    apiClient.post('/auth/login', { email, password }),
   register: (data: any) => apiClient.post('/auth/register', data),
   refresh: (refreshToken: string) => apiClient.post('/auth/refresh', { refreshToken }),
   logout: () => apiClient.post('/auth/logout'),
+  /** 현재 로그인 유저 정보 조회 */
+  getMe: () => apiClient.get('/auth/me'),
   telecomRequest: (returnUrl: string) =>
-    apiClient.get(`/auth/telecom/request?returnUrl=${returnUrl}`),
+    apiClient.get(`/auth/telecom/request?returnUrl=${encodeURIComponent(returnUrl)}`),
   telecomVerify: (encData: string) =>
     apiClient.post('/auth/telecom/verify', { encData }),
+  /** 소셜 임시 토큰에서 프로필 조회 (가입 pre-fill용) */
+  getSocialProfile: (token: string) =>
+    apiClient.get(`/auth/social/profile?token=${encodeURIComponent(token)}`),
+  /** 내 소셜 연동 목록 */
+  getMySocials: () => apiClient.get('/auth/me/socials'),
+  /** 소셜 계정 연동 */
+  linkSocial: (socialToken: string) =>
+    apiClient.post('/auth/social/link', { socialToken }),
+  /** 소셜 계정 연동 해제 */
+  unlinkSocial: (provider: string) =>
+    apiClient.delete(`/auth/social/unlink/${provider}`),
 };
 
 export const pointsApi = {
