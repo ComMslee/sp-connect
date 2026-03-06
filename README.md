@@ -242,15 +242,15 @@ DB(①)와 캐시(②)가 정상 기동된 후에 시작됩니다.
 
 **테스트 회원 계정 10개** (로그인 화면에서 사용)
 
-비밀번호 공통: `Test1234!`
+로그인 방식: **이메일 + 비밀번호** (비밀번호 공통: `Test1234!`)
 
-| 번호 | 전화번호 | 포인트 | 상태 |
-|------|----------|--------|------|
-| 1~3 | 010-0000-0001 ~ 003 | 0 P | 활성 |
-| 4~6 | 010-0000-0004 ~ 006 | 5,000 P | 활성 |
-| 7~8 | 010-0000-0007 ~ 008 | 15,000 P | 활성 |
-| 9 | 010-0000-0009 | 3,000 P | 정지 (로그인 불가) |
-| 10 | 010-0000-0010 | 100,000 P | 활성 |
+| 번호 | 이메일 | 포인트 | 상태 |
+|------|--------|--------|------|
+| 1~3 | test1@test.com ~ test3@test.com | 0 P | 활성 |
+| 4~6 | test4@test.com ~ test6@test.com | 5,000 P | 활성 |
+| 7~8 | test7@test.com ~ test8@test.com | 15,000 P | 활성 |
+| 9 | test9@test.com | 3,000 P | 정지 (로그인 불가) |
+| 10 | test10@test.com | 100,000 P | 활성 |
 
 > DB를 초기화(`docker-compose down -v`)하면 테스트 계정도 자동으로 다시 생성됩니다.
 
@@ -579,10 +579,12 @@ point-web/
 │
 ├── frontend/                 # Next.js 프론트엔드
 │   └── src/app/
-│       ├── login/            # 로그인 페이지
-│       ├── register/         # 회원가입 (준비 중 - NICE 본인인증 연동 예정)
+│       ├── login/            # 로그인 페이지 (이메일+비밀번호, 소셜 로그인)
+│       ├── register/         # 회원가입 (2단계: NICE 본인인증 → 이메일/PW 설정)
+│       ├── auth/social/
+│       │   └── callback/     # 소셜 로그인 콜백 (자동 로그인 or 계정 연동 분기)
 │       ├── member/           # 회원용 화면 (로그인 필요)
-│       │   ├── dashboard/    # 포인트 현황
+│       │   ├── dashboard/    # 포인트 현황 + 소셜 계정 연동/해제
 │       │   ├── earn/         # 포인트 적립 (준비 중 - UI stub)
 │       │   ├── use/          # 포인트 사용 (준비 중 - UI stub)
 │       │   └── history/      # 포인트 내역 (준비 중 - UI stub)
@@ -595,7 +597,7 @@ point-web/
 │           └── sites/        # 연동 사이트 (API 키 발급/관리)
 │
 ├── database/
-│   └── init.sql              # DB 테이블 생성 스크립트
+│   └── init.sql              # DB 테이블 생성 스크립트 (users, user_social_providers 등)
 │
 ├── infra/nginx/nginx.conf    # 웹서버 설정
 ├── docs/API_SPEC.md          # 외부 연동 API 명세서
@@ -613,7 +615,7 @@ point-web/
 |------|------|
 | 백엔드 | NestJS, TypeORM, PostgreSQL |
 | 프론트엔드 | Next.js 14, Tailwind CSS, Zustand |
-| 인증 | JWT, 카카오/네이버 OAuth, NICE 본인인증 |
+| 인증 | JWT, 이메일+비밀번호 로그인, 카카오/네이버 OAuth 연동, NICE 본인인증(가입 시 필수) |
 | 인프라 | Docker, AWS ECS Fargate, RDS, ElastiCache |
 | CI/CD | GitHub Actions |
 
@@ -621,7 +623,7 @@ point-web/
 
 ## 13. 페이지 스크린샷
 
-> 📅 캡쳐 시점: **2026-03-06 08:43 KST**
+> 📅 최초 캡쳐: 2026-03-06 08:43 KST
 > 스크린샷 재생성: `node scripts/take-screenshots.js`
 
 ### 회원 페이지
